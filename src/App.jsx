@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
 import InvoiceAnalyzer from './InvoiceAnalyzer'
 import './App.css'
+import m2dLogo from './assets/m2d.png'
 
 function App() {
   const [messages, setMessages] = useState([])
@@ -230,8 +231,7 @@ function App() {
             <div className="welcome-section">
               <div className="logo-container">
                 <div className="logo">
-                  <span className="logo-icon">🌱</span>
-                  <span className="logo-text">Minus2Degrees</span>
+                  <img src={m2dLogo} alt="Minus2Degrees" className="logo-image" />
                 </div>
                 <p className="tagline">Your AI assistant for sustainable living</p>
               </div>
@@ -259,7 +259,7 @@ function App() {
                   {message.role === 'user' ? (
                     <div className="user-avatar">You</div>
                   ) : (
-                    <div className="ai-avatar">🌱</div>
+                    <div className="ai-avatar"><img src={m2dLogo} alt="M2D" className="ai-avatar-image" /></div>
                   )}
                 </div>
                 <div className="message-content">
@@ -284,7 +284,7 @@ function App() {
             <div className="message-wrapper assistant">
               <div className="message">
                 <div className="message-avatar">
-                  <div className="ai-avatar">🌱</div>
+                  <div className="ai-avatar"><img src={m2dLogo} alt="M2D" className="ai-avatar-image" /></div>
                 </div>
                 <div className="message-content">
                   <div className="typing-indicator">
