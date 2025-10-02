@@ -133,25 +133,55 @@ function App() {
 
       if (data.status === 'success' && data.result) {
         // Transform API response to match UI structure
-        const formattedResult = data.result.formatted_result
-        
+        const formattedResult = data.result.formatted_result || {}
+        const emissionCalculations = data.result.emission_calculations
+
+        // Build emissions structure with error handling
+        let emissions = null
+        let carbonEstimatedText = 'N/A'
+        let carbonEquivalenceText = 'Carbon impact unavailable'
+
+        if (emissionCalculations && emissionCalculations.status === 'error') {
+          emissions = { error: { message: emissionCalculations.message || 'Unknown error' } }
+        } else if (emissionCalculations && Array.isArray(emissionCalculations.items)) {
+          const sum = emissionCalculations.totals?.sum_emissions_kgco2e
+          emissions = {
+            invoice_name: emissionCalculations.invoice_name,
+            supplier: emissionCalculations.supplier,
+            currency: emissionCalculations.currency,
+            items: emissionCalculations.items,
+            totals: emissionCalculations.totals,
+            notes: emissionCalculations.notes
+          }
+          if (typeof sum === 'number') {
+            carbonEstimatedText = `${sum.toFixed(2)} kgCO2e`
+            carbonEquivalenceText = `Total estimated emissions`
+          }
+        }
+
         setInvoiceAnalysis({
           vendor: formattedResult.supplier || 'Unknown Vendor',
-          total: `$${formattedResult.total_cost?.toFixed(2) || '0.00'}`,
+          total: `$${(formattedResult.total_cost ?? 0).toFixed(2)}`,
           date: new Date().toLocaleDateString(), // API doesn't provide date, using current date
           invoiceNumber: formattedResult.invoice_name || 'N/A',
-          items: formattedResult.items?.map(item => ({
+          items: (formattedResult.items || []).map(item => ({
             description: item.name,
             quantity: item.quantity,
-            price: `$${item.total_price?.toFixed(2) || '0.00'}`,
+            unitPrice: item.unit_price,
+            price: `$${(item.total_price ?? 0).toFixed(2)}`,
             weight: item.weight,
             material: item.material,
-            confidence: item.confidence
-          })) || [],
+            confidence: item.confidence,
+            method: item.method
+          })),
           carbonFootprint: {
-            estimated: "Analysis pending",
-            equivalence: "Carbon impact calculation coming soon"
+            estimated: carbonEstimatedText,
+            equivalence: carbonEquivalenceText
           },
+          emissions,
+          methodology: data.result.methodology,
+          filename: data.result.filename,
+          extractedTextLength: data.result.extracted_text_length,
           rawData: data.result // Store raw data for debugging/export
         })
       } else {

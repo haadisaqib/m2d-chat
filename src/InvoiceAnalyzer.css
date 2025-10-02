@@ -279,11 +279,33 @@
   animation: slideInUp 0.5s ease-out;
 }
 
+.results-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
 .analysis-results h3 {
   font-size: 1.5rem;
   margin: 0 0 1.5rem 0;
   color: #ffffff;
   text-align: center;
+}
+
+.results-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.chip-button {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e5e7eb;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  cursor: pointer;
 }
 
 .results-grid {
@@ -299,6 +321,24 @@
   border-radius: 12px;
   padding: 1.5rem;
   transition: all 0.3s ease;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.card-toggle {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e5e7eb;
+  padding: 0.25rem 0.6rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  cursor: pointer;
 }
 
 .result-card:hover {
@@ -367,7 +407,22 @@
 }
 
 .items-list {
-  space-y: 0.75rem;
+  display: block;
+}
+
+.scroll-section {
+  max-height: 360px;
+  overflow: auto;
+  padding-right: 0.25rem;
+}
+
+.scroll-section::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scroll-section::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.15);
+  border-radius: 9999px;
 }
 
 .item-row {
@@ -402,6 +457,18 @@
   border-top: 1px solid rgba(255, 255, 255, 0.05);
   font-size: 0.85rem;
   color: #9ca3af;
+}
+
+.long-text {
+  white-space: pre-wrap;
+}
+
+.inline-toggle {
+  background: transparent;
+  border: none;
+  color: #a78bfa;
+  cursor: pointer;
+  font-size: 0.85rem;
 }
 
 .item-weight,
@@ -502,6 +569,9 @@
   .results-grid {
     grid-template-columns: 1fr;
     gap: 1rem;
+  }
+  .scroll-section {
+    max-height: 280px;
   }
   
   .item-row {
