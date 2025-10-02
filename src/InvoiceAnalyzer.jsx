@@ -236,7 +236,7 @@ function InvoiceAnalyzer({
                     </div>
                     )}
                   </div>
-                  <div className="result-card">
+                  <div className="result-card items-card">
                     <div className="card-header">
                       <h4>Emissions</h4>
                       <button className="card-toggle" onClick={() => setExpandEmissions(v => !v)}>{expandEmissions ? 'Hide' : 'Show'}</button>
