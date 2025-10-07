@@ -15,6 +15,7 @@ function App() {
   const [invoiceFile, setInvoiceFile] = useState(null)
   const [invoiceAnalysis, setInvoiceAnalysis] = useState(null)
   const [invoiceAnalyzing, setInvoiceAnalyzing] = useState(false)
+  const [invoiceMethodology, setInvoiceMethodology] = useState('auto')
   
   const messagesEndRef = useRef(null)
   const textareaRef = useRef(null)
@@ -115,12 +116,13 @@ function App() {
       // Prepare API payload
       const payload = {
         document_base64: base64Data,
-        methodology: "auto",
+        methodology: invoiceMethodology || "auto",
         filename: invoiceFile.name
       }
 
       // Make API call
-      const response = await fetch(`${baseUrl}/api/v1/invoice-analyzer/invoice`, {
+      const url = `${baseUrl}/api/v1/invoice-analyzer/invoice?methodology=${encodeURIComponent(invoiceMethodology || 'auto')}`
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -134,7 +136,7 @@ function App() {
       if (data.status === 'success' && data.result) {
         // Transform API response to match UI structure
         const formattedResult = data.result.formatted_result || {}
-        const emissionCalculations = data.result.emission_calculations
+        const emissionCalculations = data.result.emission_calculations || data.result.emissions_calculations || data.result.emissions
 
         // Build emissions structure with error handling
         let emissions = null
@@ -365,6 +367,8 @@ function App() {
           onFileSelect={handleInvoiceFile}
           onAnalyze={analyzeInvoice}
           onReset={resetInvoiceAnalysis}
+          methodology={invoiceMethodology}
+          onMethodologyChange={setInvoiceMethodology}
         />
       )}
     </div>

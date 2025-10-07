@@ -7,7 +7,9 @@ function InvoiceAnalyzer({
   analysisResult, 
   onFileSelect, 
   onAnalyze, 
-  onReset 
+  onReset,
+  methodology,
+  onMethodologyChange
 }) {
   const [dragActive, setDragActive] = useState(false)
   const fileInputRef = useRef(null)
@@ -129,6 +131,19 @@ function InvoiceAnalyzer({
 
             {!analysisResult && (
               <div className="analyze-controls">
+                <div className="methodology-controls">
+                  <label htmlFor="methodology-select">Methodology</label>
+                  <select
+                    id="methodology-select"
+                    value={methodology || 'auto'}
+                    onChange={(e) => onMethodologyChange?.(e.target.value)}
+                    disabled={isAnalyzing}
+                  >
+                    <option value="auto">Auto</option>
+                    <option value="activity">Activity</option>
+                    <option value="spend">Spend</option>
+                  </select>
+                </div>
                 <button
                   className="analyze-button"
                   onClick={analyzeInvoice}
@@ -148,181 +163,184 @@ function InvoiceAnalyzer({
 
             {analysisResult && (
               <div className="analysis-results">
-                <div className="results-header">
-                  <h3>Analysis Results</h3>
-                  <div className="results-actions">
-                    <button className="chip-button" onClick={() => { setExpandLineItems(true); setExpandEmissions(true) }}>Expand all</button>
-                    <button className="chip-button" onClick={() => { setExpandLineItems(false); setExpandEmissions(false) }}>Collapse all</button>
-                  </div>
-                </div>
-                
-                <div className="results-grid">
-                  <div className="result-card">
-                    <h4>Invoice Details</h4>
-                    <div className="detail-row">
-                      <span>Invoice #:</span>
-                      <span>{analysisResult.invoiceNumber}</span>
-                    </div>
-                    <div className="detail-row">
-                      <span>Vendor:</span>
-                      <span>{analysisResult.vendor}</span>
-                    </div>
-                    <div className="detail-row">
-                      <span>Date:</span>
-                      <span>{analysisResult.date}</span>
-                    </div>
-                    <div className="detail-row total">
-                      <span>Total:</span>
-                      <span>{analysisResult.total}</span>
-                    </div>
-                    {analysisResult.methodology && (
-                      <div className="detail-row">
-                        <span>Methodology:</span>
-                        <span>{analysisResult.methodology}</span>
+                {(() => {
+                  const api = analysisResult?.result ? analysisResult.result : analysisResult
+                  const formatted = api?.formatted_result
+                  const emissions = api?.emission_calculations || api?.emissions_calculations || api?.emissions
+                  const meta = {
+                    filename: api?.filename || analysisResult?.filename,
+                    supplier: formatted?.supplier ?? emissions?.supplier ?? analysisResult?.vendor ?? analysisResult?.supplier,
+                    total_cost: typeof formatted?.total_cost === 'number' ? formatted.total_cost : analysisResult?.total,
+                    methodology: api?.methodology || analysisResult?.methodology,
+                    extracted_text_length: api?.extracted_text_length ?? analysisResult?.extractedTextLength
+                  }
+                  const items = Array.isArray(formatted?.items) ? formatted.items : (Array.isArray(analysisResult?.items) ? analysisResult.items : [])
+                  const emissionsError = emissions && emissions.status === 'error'
+                  const emissionsOk = emissions && !emissionsError
+                  return (
+                    <>
+                      <div className="results-header">
+                        <h3>Analysis Results</h3>
+                        <div className="results-actions">
+                          <button className="chip-button" onClick={() => { setExpandLineItems(true); setExpandEmissions(true) }}>Expand all</button>
+                          <button className="chip-button" onClick={() => { setExpandLineItems(false); setExpandEmissions(false) }}>Collapse all</button>
+                        </div>
                       </div>
-                    )}
-                    {analysisResult.filename && (
-                      <div className="detail-row">
-                        <span>File:</span>
-                        <span>{analysisResult.filename}</span>
-                      </div>
-                    )}
-                    {typeof analysisResult.extractedTextLength === 'number' && (
-                      <div className="detail-row">
-                        <span>Extracted Text Length:</span>
-                        <span>{analysisResult.extractedTextLength}</span>
-                      </div>
-                    )}
-                  </div>
 
-                  <div className="result-card">
-                    <h4>Environmental Impact</h4>
-                    <div className="impact-metric">
-                      <div className="metric-icon">🌱</div>
-                      <div className="metric-text">
-                        <div className="metric-value">{analysisResult.carbonFootprint.estimated}</div>
-                        <div className="metric-desc">{analysisResult.carbonFootprint.equivalence}</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="result-card items-card">
-                    <div className="card-header">
-                      <h4>Line Items</h4>
-                      <button className="card-toggle" onClick={() => setExpandLineItems(v => !v)}>{expandLineItems ? 'Hide' : 'Show'}</button>
-                    </div>
-                    {expandLineItems && (
-                    <div className="items-list scroll-section">
-                      {analysisResult.items.map((item, index) => (
-                        <div key={index} className="item-row expanded">
-                          <div className="item-main">
-                            <div className="item-desc">{item.description}</div>
-                            <div className="item-qty">Qty: {item.quantity}</div>
-                            <div className="item-price">{item.price}</div>
-                          </div>
-                          <div className="item-details">
-                            {typeof item.unitPrice === 'number' && (
-                              <div className="item-unit-price">Unit Price: ${item.unitPrice.toFixed(2)}</div>
-                            )}
-                            <div className="item-weight">Weight: {item.weight || 'N/A'}</div>
-                            <div className="item-material">Material: {item.material || 'N/A'}</div>
-                            <div className="item-method">Method: {item.method || 'N/A'}</div>
-                            <div className="item-confidence">
-                              Confidence: {item.confidence ? `${(item.confidence * 100).toFixed(0)}%` : 'N/A'}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    )}
-                  </div>
-                  <div className="result-card items-card">
-                    <div className="card-header">
-                      <h4>Emissions</h4>
-                      <button className="card-toggle" onClick={() => setExpandEmissions(v => !v)}>{expandEmissions ? 'Hide' : 'Show'}</button>
-                    </div>
-                    {!analysisResult.emissions && (
-                      <div className="detail-row">
-                        <span>Summary:</span>
-                        <span>No emissions data available</span>
-                      </div>
-                    )}
-                    {analysisResult.emissions && analysisResult.emissions.error && (
-                      <div className="detail-row">
-                        <span>Status:</span>
-                        <span style={{ color: '#d9534f' }}>Error - {analysisResult.emissions.error.message}</span>
-                      </div>
-                    )}
-                    {analysisResult.emissions && !analysisResult.emissions.error && expandEmissions && (
-                      <>
-                        <div className="detail-row">
-                          <span>Invoice:</span>
-                          <span>{analysisResult.emissions.invoice_name}</span>
-                        </div>
-                        <div className="detail-row">
-                          <span>Supplier:</span>
-                          <span>{analysisResult.emissions.supplier}</span>
-                        </div>
-                        <div className="detail-row">
-                          <span>Currency:</span>
-                          <span>{analysisResult.emissions.currency}</span>
-                        </div>
-                        <div className="items-list scroll-section">
-                          {analysisResult.emissions.items?.map((eItem, idx) => (
-                            <div key={idx} className="item-row expanded">
-                              <div className="item-main">
-                                <div className="item-desc">{eItem.name}</div>
-                                <div className="item-qty">Method: {eItem.methodology_applied}</div>
-                                <div className="item-price">Emissions: {typeof eItem.emissions_kgco2e === 'number' ? `${eItem.emissions_kgco2e.toFixed(2)} kgCO2e` : 'N/A'}</div>
-                              </div>
-                              <div className="item-details">
-                                <div className="item-weight">Inputs:</div>
-                                <div className="item-material">
-                                  Qty: {eItem.inputs?.quantity ?? 'N/A'} | Unit Price: {typeof eItem.inputs?.unit_price === 'number' ? `$${eItem.inputs.unit_price.toFixed(2)}` : 'N/A'} | Total: {typeof eItem.inputs?.total_price === 'number' ? `$${eItem.inputs.total_price.toFixed(2)}` : 'N/A'}
-                                </div>
-                                <div className="item-weight">Weight: {eItem.inputs?.weight ?? 'N/A'} | Material: {eItem.inputs?.material ?? 'N/A'}</div>
-                                {eItem.factor_used && (
-                                  <div className="item-material">Factor: {eItem.factor_used.value} {eItem.factor_used.unit} ({eItem.factor_used.basis})</div>
-                                )}
-                                {eItem.calculation && (
-                                  <div className="item-material">Calc: <TruncatedText text={eItem.calculation} /></div>
-                                )}
-                                {eItem.assumptions && (
-                                  <div className="item-material">Assumptions: <TruncatedText text={eItem.assumptions} /></div>
-                                )}
-                                {typeof eItem.confidence === 'number' && (
-                                  <div className="item-confidence">Confidence: {(eItem.confidence * 100).toFixed(0)}%</div>
-                                )}
-                                {eItem.source && (
-                                  <div className="item-material">Source: {eItem.source}</div>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                        <div className="detail-row total">
-                          <span>Total Emissions:</span>
-                          <span>{typeof analysisResult.emissions.totals?.sum_emissions_kgco2e === 'number' ? `${analysisResult.emissions.totals.sum_emissions_kgco2e.toFixed(2)} kgCO2e` : 'N/A'}</span>
-                        </div>
-                        {analysisResult.emissions.notes && (
+                      <div className="results-grid">
+                        <div className="result-card">
+                          <h4>Header / Meta</h4>
                           <div className="detail-row">
-                            <span>Notes:</span>
-                            <span className="long-text"><TruncatedText text={analysisResult.emissions.notes} limit={320} /></span>
+                            <span>File:</span>
+                            <span>{meta.filename || selectedFile?.name || 'N/A'}</span>
                           </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </div>
+                          <div className="detail-row">
+                            <span>Supplier:</span>
+                            <span>{meta.supplier || 'N/A'}</span>
+                          </div>
+                          <div className="detail-row">
+                            <span>Total Cost:</span>
+                            <span>{typeof meta.total_cost === 'number' ? `$${meta.total_cost.toFixed(2)}` : (meta.total_cost || 'N/A')}</span>
+                          </div>
+                          <div className="detail-row">
+                            <span>Methodology:</span>
+                            <span>{meta.methodology || 'N/A'}</span>
+                          </div>
+                          {typeof meta.extracted_text_length === 'number' && (
+                            <div className="detail-row">
+                              <span>Extracted Text Length:</span>
+                              <span>{meta.extracted_text_length}</span>
+                            </div>
+                          )}
+                        </div>
 
-                <div className="action-buttons">
-                  <button className="secondary-button" onClick={resetAnalysis}>
-                    Analyze Another
-                  </button>
-                  <button className="primary-button">
-                    Export Results
-                  </button>
-                </div>
+                        <div className="result-card items-card">
+                          <div className="card-header">
+                            <h4>Items (LLM)</h4>
+                            <button className="card-toggle" onClick={() => setExpandLineItems(v => !v)}>{expandLineItems ? 'Hide' : 'Show'}</button>
+                          </div>
+                          {expandLineItems && (
+                            <div className="table-wrapper scroll-section">
+                              <table className="cell-table">
+                                <thead>
+                                  <tr>
+                                    <th>Name</th>
+                                    <th>Quantity</th>
+                                    <th>Unit Price</th>
+                                    <th>Total Price</th>
+                                    <th>Method</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {items.length === 0 && (
+                                    <tr>
+                                      <td colSpan={5} className="empty">No items</td>
+                                    </tr>
+                                  )}
+                                  {items.map((it, idx) => (
+                                    <tr key={idx}>
+                                      <td>{it.name || it.description || '—'}</td>
+                                      <td>{typeof it.quantity === 'number' ? it.quantity : '—'}</td>
+                                      <td>{typeof it.unit_price === 'number' ? `$${it.unit_price.toFixed(2)}` : (typeof it.unitPrice === 'number' ? `$${it.unitPrice.toFixed(2)}` : '—')}</td>
+                                      <td>{typeof it.total_price === 'number' ? `$${it.total_price.toFixed(2)}` : (typeof it.price === 'number' ? `$${it.price.toFixed(2)}` : (it.price || '—'))}</td>
+                                      <td>{it.method || it.methodology_applied || '—'}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="result-card items-card">
+                          <div className="card-header">
+                            <h4>Emissions (Expert)</h4>
+                            <button className="card-toggle" onClick={() => setExpandEmissions(v => !v)}>{expandEmissions ? 'Hide' : 'Show'}</button>
+                          </div>
+                          {!emissions && (
+                            <div className="detail-row">
+                              <span>Summary:</span>
+                              <span>No emissions data available</span>
+                            </div>
+                          )}
+                          {emissionsError && (
+                            <div className="detail-row">
+                              <span>Status:</span>
+                              <span style={{ color: '#d9534f' }}>Error - {emissions?.message || 'Unknown error'}</span>
+                            </div>
+                          )}
+                          {emissionsOk && expandEmissions && (
+                            <>
+                              <div className="detail-row">
+                                <span>Invoice:</span>
+                                <span>{emissions.invoice_name || 'N/A'}</span>
+                              </div>
+                              <div className="detail-row">
+                                <span>Supplier:</span>
+                                <span>{emissions.supplier || 'N/A'}</span>
+                              </div>
+                              <div className="detail-row">
+                                <span>Currency:</span>
+                                <span>{emissions.currency || 'N/A'}</span>
+                              </div>
+                              <div className="table-wrapper scroll-section">
+                                <table className="cell-table">
+                                  <thead>
+                                    <tr>
+                                      <th>Name</th>
+                                      <th>Factor Used</th>
+                                      <th>Calculation</th>
+                                      <th>Emissions (kgCO2e)</th>
+                                      <th>Confidence</th>
+                                      <th>Source</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {Array.isArray(emissions.items) && emissions.items.length > 0 ? (
+                                      emissions.items.map((eItem, idx) => (
+                                        <tr key={idx}>
+                                          <td>{eItem.name || '—'}</td>
+                                          <td>{eItem.factor_used ? `${eItem.factor_used.value} ${eItem.factor_used.unit}` : '—'}</td>
+                                          <td className="calc"><TruncatedText text={eItem.calculation} limit={160} /></td>
+                                          <td>{typeof eItem.emissions_kgco2e === 'number' ? eItem.emissions_kgco2e.toFixed(2) : '—'}</td>
+                                          <td>{typeof eItem.confidence === 'number' ? `${(eItem.confidence * 100).toFixed(0)}%` : '—'}</td>
+                                          <td>{eItem.source || '—'}</td>
+                                        </tr>
+                                      ))
+                                    ) : (
+                                      <tr>
+                                        <td colSpan={6} className="empty">No emissions items</td>
+                                      </tr>
+                                    )}
+                                  </tbody>
+                                </table>
+                              </div>
+                              <div className="detail-row total">
+                                <span>Total Emissions:</span>
+                                <span>{typeof emissions.totals?.sum_emissions_kgco2e === 'number' ? `${emissions.totals.sum_emissions_kgco2e.toFixed(2)} kgCO2e` : 'N/A'}</span>
+                              </div>
+                              {emissions.notes && (
+                                <div className="detail-row">
+                                  <span>Notes:</span>
+                                  <span className="long-text"><TruncatedText text={emissions.notes} limit={320} /></span>
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="action-buttons">
+                        <button className="secondary-button" onClick={resetAnalysis}>
+                          Analyze Another
+                        </button>
+                        <button className="primary-button">
+                          Export Results
+                        </button>
+                      </div>
+                    </>
+                  )
+                })()}
               </div>
             )}
           </div>

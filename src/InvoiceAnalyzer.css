@@ -227,6 +227,30 @@
   margin-bottom: 2rem;
 }
 
+.methodology-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-right: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+}
+
+.methodology-controls label {
+  color: #e5e7eb;
+  font-size: 0.9rem;
+}
+
+.methodology-controls select {
+  background: rgba(17,17,17,0.6);
+  color: #e5e7eb;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 6px;
+  padding: 0.35rem 0.5rem;
+}
+
 .analyze-button {
   background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
   color: white;
@@ -408,6 +432,50 @@
 
 .items-list {
   display: block;
+}
+
+/* Cell Tables */
+.table-wrapper {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.cell-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.cell-table thead th {
+  position: sticky;
+  top: 0;
+  background: rgba(255, 255, 255, 0.06);
+  color: #e5e7eb;
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 0.75rem 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.cell-table tbody td {
+  padding: 0.75rem 0.75rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  vertical-align: top;
+}
+
+.cell-table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.cell-table td.empty {
+  text-align: center;
+  color: #9ca3af;
+}
+
+.cell-table td.calc {
+  max-width: 420px;
 }
 
 .scroll-section {
