@@ -97,26 +97,13 @@ function App() {
     setInvoiceAnalysis(null)
     
     try {
-      // Convert file to base64
-      const fileToBase64 = (file) => {
-        return new Promise((resolve, reject) => {
-          const reader = new FileReader()
-          reader.readAsDataURL(file)
-          reader.onload = () => {
-            // Remove the data:*/*;base64, prefix
-            const base64String = reader.result.split(',')[1]
-            resolve(base64String)
-          }
-          reader.onerror = (error) => reject(error)
-        })
-      }
-
-      const base64Data = await fileToBase64(invoiceFile)
+      // Convert file to base64 using ArrayBuffer (no data URI prefix)
+      const arrayBuffer = await invoiceFile.arrayBuffer()
+      const base64Data = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)))
       
       // Prepare API payload
       const payload = {
         document_base64: base64Data,
-        methodology: invoiceMethodology || "auto",
         filename: invoiceFile.name
       }
 
