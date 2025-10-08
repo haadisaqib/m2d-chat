@@ -104,11 +104,17 @@ function App() {
       // Prepare API payload
       const payload = {
         document_base64: base64Data,
+        methodology: invoiceMethodology || 'auto',
         filename: invoiceFile.name
       }
 
       // Make API call
       const url = `${baseUrl}/api/v1/invoice-analyzer/invoice?methodology=${encodeURIComponent(invoiceMethodology || 'auto')}`
+      
+      console.log('Request URL:', url)
+      console.log('Request payload:', payload)
+      console.log('Base64 length:', base64Data.length)
+      
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -117,6 +123,15 @@ function App() {
         },
         body: JSON.stringify(payload)
       })
+
+      console.log('Response status:', response.status)
+      console.log('Response headers:', Object.fromEntries(response.headers.entries()))
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('Error response:', errorText)
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
+      }
 
       const data = await response.json()
 
