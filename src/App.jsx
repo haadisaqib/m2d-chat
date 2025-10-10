@@ -99,7 +99,14 @@ function App() {
     try {
       // Convert file to base64 using ArrayBuffer (no data URI prefix)
       const arrayBuffer = await invoiceFile.arrayBuffer()
-      const base64Data = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)))
+      const uint8Array = new Uint8Array(arrayBuffer)
+      let binaryString = ''
+      const chunkSize = 8192 // Process in chunks to avoid stack overflow
+      for (let i = 0; i < uint8Array.length; i += chunkSize) {
+        const chunk = uint8Array.slice(i, i + chunkSize)
+        binaryString += String.fromCharCode(...chunk)
+      }
+      const base64Data = btoa(binaryString)
       
       // Prepare API payload
       const payload = {
