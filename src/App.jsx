@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
 import InvoiceAnalyzer from './InvoiceAnalyzer'
+import InvoiceAnalyzerV2 from './InvoiceAnalyzerV2'
 import './App.css'
 import m2dLogo from './assets/m2d.png'
 
@@ -16,6 +17,12 @@ function App() {
   const [invoiceAnalysis, setInvoiceAnalysis] = useState(null)
   const [invoiceAnalyzing, setInvoiceAnalyzing] = useState(false)
   const [invoiceMethodology, setInvoiceMethodology] = useState('auto')
+  
+  // Invoice analyzer V2 state
+  const [invoiceV2File, setInvoiceV2File] = useState(null)
+  const [invoiceV2Analysis, setInvoiceV2Analysis] = useState(null)
+  const [invoiceV2Analyzing, setInvoiceV2Analyzing] = useState(false)
+  const [invoiceV2Methodology, setInvoiceV2Methodology] = useState('auto')
   
   const messagesEndRef = useRef(null)
   const textareaRef = useRef(null)
@@ -223,6 +230,133 @@ function App() {
     setInvoiceAnalysis(null)
   }
 
+  // Invoice V2 analysis handler
+  const analyzeInvoiceV2 = async () => {
+    if (!invoiceV2File) return
+
+    setInvoiceV2Analyzing(true)
+    setInvoiceV2Analysis(null)
+    
+    try {
+      // Convert file to base64 using ArrayBuffer (no data URI prefix)
+      const arrayBuffer = await invoiceV2File.arrayBuffer()
+      const uint8Array = new Uint8Array(arrayBuffer)
+      let binaryString = ''
+      const chunkSize = 8192 // Process in chunks to avoid stack overflow
+      for (let i = 0; i < uint8Array.length; i += chunkSize) {
+        const chunk = uint8Array.slice(i, i + chunkSize)
+        binaryString += String.fromCharCode(...chunk)
+      }
+      const base64Data = btoa(binaryString)
+      
+      // Prepare API payload
+      const payload = {
+        document_base64: base64Data,
+        filename: invoiceV2File.name
+      }
+
+      // Make API call to V2 endpoint
+      const url = `${baseUrl}/api/v1/invoice-analyzer-v2/invoice?methodology=${encodeURIComponent(invoiceV2Methodology || 'auto')}`
+      
+      console.log('V2 Request URL:', url)
+      console.log('V2 Request payload:', payload)
+      console.log('V2 Base64 length:', base64Data.length)
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer 1'
+        },
+        body: JSON.stringify(payload)
+      })
+
+      console.log('V2 Response status:', response.status)
+      console.log('V2 Response headers:', Object.fromEntries(response.headers.entries()))
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('V2 Error response:', errorText)
+        throw new Error(`HTTP ${response.status}: ${errorText}`)
+      }
+
+      const responseText = await response.text()
+      console.log('V2 Raw response text:', responseText)
+      
+      // Try to extract JSON from the response (in case there are log messages mixed in)
+      let data
+      try {
+        // First try to parse the entire response as JSON
+        data = JSON.parse(responseText)
+      } catch (parseError) {
+        console.log('Failed to parse as JSON, trying to extract JSON from response')
+        // If that fails, try to find JSON array in the response
+        // Look for the first '[' that starts a JSON array
+        const firstBracket = responseText.indexOf('[')
+        if (firstBracket !== -1) {
+          // Find the matching closing bracket by counting brackets
+          let bracketCount = 0
+          let endIndex = firstBracket
+          for (let i = firstBracket; i < responseText.length; i++) {
+            if (responseText[i] === '[') bracketCount++
+            if (responseText[i] === ']') bracketCount--
+            if (bracketCount === 0) {
+              endIndex = i
+              break
+            }
+          }
+          const jsonString = responseText.substring(firstBracket, endIndex + 1)
+          data = JSON.parse(jsonString)
+        } else {
+          throw new Error('Could not find JSON array in response')
+        }
+      }
+      
+      console.log('V2 Parsed data:', data)
+      console.log('Data type:', typeof data)
+      console.log('Has result?', !!data?.result)
+      console.log('Has emission_calculations?', !!data?.result?.emission_calculations)
+      console.log('Is emission_calculations array?', Array.isArray(data?.result?.emission_calculations))
+
+      // V2 API returns a wrapper object with emissions in result.emission_calculations
+      if (data && data.result && Array.isArray(data.result.emission_calculations)) {
+        console.log('Setting V2 analysis with emissions array')
+        setInvoiceV2Analysis(data.result.emission_calculations)
+      } else if (data && data.status === 'error') {
+        throw new Error(data.detail || 'Failed to analyze invoice')
+      } else if (Array.isArray(data)) {
+        // Fallback: if it's still a direct array (old format)
+        console.log('Fallback: Setting V2 analysis with direct array data')
+        setInvoiceV2Analysis(data)
+      } else {
+        console.log('Unexpected response format:', data)
+        throw new Error('Unexpected response format')
+      }
+    } catch (error) {
+      console.error('Error analyzing invoice V2:', error)
+      alert(`Failed to analyze invoice: ${error.message}`)
+      setInvoiceV2Analysis(null)
+    } finally {
+      setInvoiceV2Analyzing(false)
+    }
+  }
+
+  // Invoice V2 file handler
+  const handleInvoiceV2File = (file) => {
+    if (file.type.includes('image/') || file.type === 'application/pdf') {
+      setInvoiceV2File(file)
+      setInvoiceV2Analysis(null)
+    } else {
+      alert('Please select an image file or PDF')
+    }
+  }
+
+  // Invoice V2 reset handler
+  const resetInvoiceV2Analysis = () => {
+    setInvoiceV2File(null)
+    setInvoiceV2Analysis(null)
+  }
+
 
   return (
     <div className="app">
@@ -246,6 +380,21 @@ function App() {
               <span className="tab-status analyzing">⏳</span>
             )}
             {invoiceAnalysis && (
+              <span className="tab-status completed">✅</span>
+            )}
+          </button>
+          <button 
+            className={`tab-button ${activeTab === 'invoice-v2' ? 'active' : ''}`}
+            onClick={() => setActiveTab('invoice-v2')}
+          >
+            📊 Invoice Analyzer V2
+            {invoiceV2File && !invoiceV2Analyzing && !invoiceV2Analysis && (
+              <span className="tab-status file-uploaded">📁</span>
+            )}
+            {invoiceV2Analyzing && (
+              <span className="tab-status analyzing">⏳</span>
+            )}
+            {invoiceV2Analysis && (
               <span className="tab-status completed">✅</span>
             )}
           </button>
@@ -368,6 +517,17 @@ function App() {
           </div>
         </div>
         </div>
+      ) : activeTab === 'invoice-v2' ? (
+        <InvoiceAnalyzerV2 
+          selectedFile={invoiceV2File}
+          isAnalyzing={invoiceV2Analyzing}
+          analysisResult={invoiceV2Analysis}
+          onFileSelect={handleInvoiceV2File}
+          onAnalyze={analyzeInvoiceV2}
+          onReset={resetInvoiceV2Analysis}
+          methodology={invoiceV2Methodology}
+          onMethodologyChange={setInvoiceV2Methodology}
+        />
       ) : (
         <InvoiceAnalyzer 
           selectedFile={invoiceFile}
