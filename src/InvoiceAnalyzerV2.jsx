@@ -237,15 +237,15 @@ function InvoiceAnalyzerV2({
                           </thead>
                           <tbody>
                             {analysisResult.map((item, idx) => (
-                              item.factor && item.factor.map((factor, fIdx) => (
-                                <tr key={`${idx}-${fIdx}`}>
+                              item.factor && (
+                                <tr key={idx}>
                                   <td className="item-name">{item.name || '—'}</td>
-                                  <td>{factor.name || '—'}</td>
-                                  <td>{factor.co2 || '—'}</td>
-                                  <td>{factor.co2_unit || '—'}</td>
-                                  <td>{factor.factorConfidence || 0}%</td>
+                                  <td>{item.factor.name || '—'}</td>
+                                  <td>{item.factor.co2 || '—'}</td>
+                                  <td>{item.factor.co2_unit || '—'}</td>
+                                  <td>{item.factor.factorConfidence || 0}%</td>
                                 </tr>
-                              ))
+                              )
                             ))}
                           </tbody>
                         </table>
