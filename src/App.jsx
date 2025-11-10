@@ -11,6 +11,7 @@ function App() {
   const [isLoading, setIsLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('chat')
   const [environment, setEnvironment] = useState('prod') // 'dev' | 'prod'
+  const [theme, setTheme] = useState('dark') // 'dark' | 'light'
   
   // Invoice analyzer state
   const [invoiceFile, setInvoiceFile] = useState(null)
@@ -359,57 +360,127 @@ function App() {
 
 
   return (
-    <div className="app">
+    <div className={`app ${theme}`}>
       <div className="tab-navigation">
         <div className="tab-container">
           <button 
             className={`tab-button ${activeTab === 'chat' ? 'active' : ''}`}
             onClick={() => setActiveTab('chat')}
           >
-            💬 Chat
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+            </svg>
+            Chat
           </button>
           <button 
             className={`tab-button ${activeTab === 'invoice' ? 'active' : ''}`}
             onClick={() => setActiveTab('invoice')}
           >
-            📄 Invoice Analyzer
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+              <polyline points="10 9 9 9 8 9"></polyline>
+            </svg>
+            Invoice Analyzer
             {invoiceFile && !invoiceAnalyzing && !invoiceAnalysis && (
-              <span className="tab-status file-uploaded">📁</span>
+              <span className="tab-status file-uploaded">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="17 8 12 3 7 8"></polyline>
+                  <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+              </span>
             )}
             {invoiceAnalyzing && (
-              <span className="tab-status analyzing">⏳</span>
+              <span className="tab-status analyzing">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+              </span>
             )}
             {invoiceAnalysis && (
-              <span className="tab-status completed">✅</span>
+              <span className="tab-status completed">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </span>
             )}
           </button>
           <button 
             className={`tab-button ${activeTab === 'invoice-v2' ? 'active' : ''}`}
             onClick={() => setActiveTab('invoice-v2')}
           >
-            📊 Invoice Analyzer V2
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="20" x2="18" y2="10"></line>
+              <line x1="12" y1="20" x2="12" y2="4"></line>
+              <line x1="6" y1="20" x2="6" y2="14"></line>
+            </svg>
+            Invoice Analyzer V2
             {invoiceV2File && !invoiceV2Analyzing && !invoiceV2Analysis && (
-              <span className="tab-status file-uploaded">📁</span>
+              <span className="tab-status file-uploaded">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="17 8 12 3 7 8"></polyline>
+                  <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+              </span>
             )}
             {invoiceV2Analyzing && (
-              <span className="tab-status analyzing">⏳</span>
+              <span className="tab-status analyzing">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+              </span>
             )}
             {invoiceV2Analysis && (
-              <span className="tab-status completed">✅</span>
+              <span className="tab-status completed">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </span>
             )}
           </button>
-          <div className="env-toggle">
-            <span className="env-label">Env</span>
-            <label className="toggle">
-              <input
-                type="checkbox"
-                checked={environment === 'prod'}
-                onChange={(e) => setEnvironment(e.target.checked ? 'prod' : 'dev')}
-              />
-              <span className="toggle-slider">
-                <span className="toggle-text">{environment === 'prod' ? 'PROD' : 'DEV'}</span>
-              </span>
-            </label>
+          <div className="controls-group">
+            <div className="env-toggle">
+              <span className="env-label">Env</span>
+              <label className="toggle">
+                <input
+                  type="checkbox"
+                  checked={environment === 'prod'}
+                  onChange={(e) => setEnvironment(e.target.checked ? 'prod' : 'dev')}
+                />
+                <span className="toggle-slider">
+                  <span className="toggle-text">{environment === 'prod' ? 'PROD' : 'DEV'}</span>
+                </span>
+              </label>
+            </div>
+            <button 
+              className="theme-toggle"
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              {theme === 'dark' ? (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="5"></circle>
+                  <line x1="12" y1="1" x2="12" y2="3"></line>
+                  <line x1="12" y1="21" x2="12" y2="23"></line>
+                  <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                  <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                  <line x1="1" y1="12" x2="3" y2="12"></line>
+                  <line x1="21" y1="12" x2="23" y2="12"></line>
+                  <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                  <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                </svg>
+              ) : (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+                </svg>
+              )}
+            </button>
           </div>
         </div>
       </div>
@@ -509,8 +580,9 @@ function App() {
                 disabled={!inputMessage.trim() || isLoading}
                 className="send-button"
               >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                  <path d="M7 11L12 6L17 11M12 18V7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="22" y1="2" x2="11" y2="13"></line>
+                  <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
                 </svg>
               </button>
             </div>
@@ -527,6 +599,7 @@ function App() {
           onReset={resetInvoiceV2Analysis}
           methodology={invoiceV2Methodology}
           onMethodologyChange={setInvoiceV2Methodology}
+          theme={theme}
         />
       ) : (
         <InvoiceAnalyzer 
@@ -538,6 +611,7 @@ function App() {
           onReset={resetInvoiceAnalysis}
           methodology={invoiceMethodology}
           onMethodologyChange={setInvoiceMethodology}
+          theme={theme}
         />
       )}
     </div>

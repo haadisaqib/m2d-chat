@@ -9,7 +9,8 @@ function InvoiceAnalyzerV2({
   onAnalyze, 
   onReset,
   methodology,
-  onMethodologyChange
+  onMethodologyChange,
+  theme = 'dark'
 }) {
   const [dragActive, setDragActive] = useState(false)
   const fileInputRef = useRef(null)
@@ -66,11 +67,18 @@ function InvoiceAnalyzerV2({
     analysisResult.reduce((sum, item) => sum + parseFloat(item.tco2 || 0), 0) : 0
 
   return (
-    <div className="invoice-analyzer purple-theme">
+    <div className={`invoice-analyzer ${theme}`}>
       <div className="analyzer-header">
         <div className="header-content">
           <div className="title-section">
-            <h1 className="analyzer-title">📊 Invoice Analyzer V2</h1>
+            <h1 className="analyzer-title">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'inline-block', verticalAlign: 'middle', marginRight: '0.75rem' }}>
+                <line x1="18" y1="20" x2="18" y2="10"></line>
+                <line x1="12" y1="20" x2="12" y2="4"></line>
+                <line x1="6" y1="20" x2="6" y2="14"></line>
+              </svg>
+              Invoice Analyzer V2
+            </h1>
             <p className="analyzer-subtitle">Advanced invoice analysis with detailed emission calculations</p>
           </div>
         </div>
@@ -86,7 +94,13 @@ function InvoiceAnalyzerV2({
             onDrop={handleDrop}
             onClick={() => fileInputRef.current?.click()}
           >
-            <div className="upload-icon">📁</div>
+            <div className="upload-icon">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+              </svg>
+            </div>
             <h3>Drop your invoice here</h3>
             <p>Or click to browse files</p>
             <div className="supported-formats">
@@ -104,13 +118,21 @@ function InvoiceAnalyzerV2({
           <div className="analysis-section">
             <div className="file-preview">
               <div className="file-info">
-                <div className="file-icon">📄</div>
+                <div className="file-icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                  </svg>
+                </div>
                 <div className="file-details">
                   <h3>{selectedFile.name}</h3>
                   <p>{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
                 </div>
                 <button className="remove-file" onClick={resetAnalysis}>
-                  ✕
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                  </svg>
                 </button>
               </div>
             </div>
@@ -141,7 +163,13 @@ function InvoiceAnalyzerV2({
                       Analyzing...
                     </span>
                   ) : (
-                    '🔍 Analyze Invoice'
+                    <>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <path d="m21 21-4.35-4.35"></path>
+                      </svg>
+                      Analyze Invoice
+                    </>
                   )}
                 </button>
               </div>
