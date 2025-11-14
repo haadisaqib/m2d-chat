@@ -66,6 +66,96 @@ function InvoiceAnalyzerV2({
   const totalEmissions = analysisResult ? 
     analysisResult.reduce((sum, item) => sum + parseFloat(item.tco2 || 0), 0) : 0
 
+  // Escape CSV value (handle commas, quotes, newlines)
+  const escapeCsvValue = (value) => {
+    if (value === null || value === undefined) return ''
+    const stringValue = String(value)
+    // If value contains comma, quote, or newline, wrap in quotes and escape quotes
+    if (stringValue.includes(',') || stringValue.includes('"') || stringValue.includes('\n')) {
+      return `"${stringValue.replace(/"/g, '""')}"`
+    }
+    return stringValue
+  }
+
+  // Export analysis results to CSV
+  const exportToCsv = () => {
+    if (!analysisResult || analysisResult.length === 0) {
+      alert('No analysis results to export')
+      return
+    }
+
+    const rows = []
+
+    // Summary section
+    rows.push('Summary')
+    rows.push('File,Total Items,Total Emissions (tCO2)')
+    rows.push([
+      escapeCsvValue(selectedFile?.name || 'N/A'),
+      escapeCsvValue(analysisResult.length),
+      escapeCsvValue(totalEmissions.toFixed(2))
+    ].join(','))
+
+    // Blank line separator
+    rows.push('')
+
+    // Invoice Items section
+    rows.push('Invoice Items')
+    rows.push([
+      'Name',
+      'Quantity',
+      'Consumption',
+      'Supplier',
+      'Emissions (tCO2)',
+      'Confidence (%)',
+      'Factor Name',
+      'CO2 Value',
+      'CO2 Unit',
+      'Factor Confidence (%)'
+    ].join(','))
+
+    // Add each item as a row
+    analysisResult.forEach((item) => {
+      const quantity = item.usages ? `${item.usages} ${item.usageUnit || ''}`.trim() : '—'
+      const consumption = item.consumption ? `${item.consumption} ${item.consumptionUnit || ''}`.trim() : '—'
+      
+      rows.push([
+        escapeCsvValue(item.name || item.description || '—'),
+        escapeCsvValue(quantity),
+        escapeCsvValue(consumption),
+        escapeCsvValue(item.tagName || '—'),
+        escapeCsvValue(parseFloat(item.tco2 || 0).toFixed(2)),
+        escapeCsvValue(item.weightConfidence || 0),
+        escapeCsvValue(item.factor?.name || '—'),
+        escapeCsvValue(item.factor?.co2 || '—'),
+        escapeCsvValue(item.factor?.co2_unit || '—'),
+        escapeCsvValue(item.factor?.factorConfidence || 0)
+      ].join(','))
+    })
+
+    // Join all rows with newlines
+    const csvContent = rows.join('\n')
+
+    // Create blob and trigger download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    const url = URL.createObjectURL(blob)
+    
+    // Generate filename with timestamp
+    const timestamp = new Date().toISOString().split('T')[0] // YYYY-MM-DD
+    const baseFilename = selectedFile?.name?.replace(/\.[^/.]+$/, '') || 'invoice-analysis'
+    const filename = `${baseFilename}-${timestamp}.csv`
+    
+    link.setAttribute('href', url)
+    link.setAttribute('download', filename)
+    link.style.visibility = 'hidden'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    
+    // Clean up the URL object
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className={`invoice-analyzer ${theme}`}>
       <div className="analyzer-header">
@@ -286,7 +376,7 @@ function InvoiceAnalyzerV2({
                   <button className="secondary-button" onClick={resetAnalysis}>
                     Analyze Another
                   </button>
-                  <button className="primary-button">
+                  <button className="primary-button" onClick={exportToCsv}>
                     Export Results
                   </button>
                 </div>
