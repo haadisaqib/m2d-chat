@@ -45,9 +45,33 @@ function App() {
   }, [inputMessage])
 
   const baseUrl = environment === 'dev' ? 'http://localhost:8000' : 'https://api.m2d.com'
+  const apiKey = import.meta.env.VITE_INTERNAL_API_KEY
+
+  // Debug: Log API key status and origin (without exposing the actual key)
+  useEffect(() => {
+    console.log('📍 Current origin:', window.location.origin)
+    console.log('📍 Current URL:', window.location.href)
+    if (!apiKey) {
+      console.error('⚠️ VITE_INTERNAL_API_KEY is not set! Please check your .env file.')
+      console.log('Available env vars:', Object.keys(import.meta.env).filter(k => k.startsWith('VITE_')))
+      console.log('💡 Make sure VITE_INTERNAL_API_KEY is set in your .env file and restart the dev server!')
+    } else {
+      console.log('✅ API key loaded successfully (length:', apiKey.length, ')')
+    }
+  }, [apiKey])
 
   const sendMessage = async () => {
     if (!inputMessage.trim()) return
+    
+    if (!apiKey) {
+      const errorMessage = { 
+        role: 'assistant', 
+        content: 'Error: API key is missing. Please set VITE_INTERNAL_API_KEY in your .env file and restart the dev server.',
+        id: Date.now() + 1
+      }
+      setMessages(prev => [...prev, errorMessage])
+      return
+    }
     
     const userMessage = { role: 'user', content: inputMessage, id: Date.now() }
     const updatedMessages = [...messages, userMessage]
@@ -60,7 +84,7 @@ function App() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer 1'
+          'X-Internal-Secret': apiKey
         },
         body: JSON.stringify({
           messages: updatedMessages.map(msg => ({ role: msg.role, content: msg.content })),
@@ -101,6 +125,11 @@ function App() {
   const analyzeInvoice = async () => {
     if (!invoiceFile) return
 
+    if (!apiKey) {
+      alert('Error: API key is missing. Please set VITE_INTERNAL_API_KEY in your .env file and restart the dev server.')
+      return
+    }
+
     setInvoiceAnalyzing(true)
     setInvoiceAnalysis(null)
     
@@ -134,7 +163,7 @@ function App() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer 1'
+          'X-Internal-Secret': apiKey
         },
         body: JSON.stringify(payload)
       })
@@ -235,6 +264,11 @@ function App() {
   const analyzeInvoiceV2 = async () => {
     if (!invoiceV2File) return
 
+    if (!apiKey) {
+      alert('Error: API key is missing. Please set VITE_INTERNAL_API_KEY in your .env file and restart the dev server.')
+      return
+    }
+
     setInvoiceV2Analyzing(true)
     setInvoiceV2Analysis(null)
     
@@ -267,7 +301,7 @@ function App() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer 1'
+          'X-Internal-Secret': apiKey
         },
         body: JSON.stringify(payload)
       })
