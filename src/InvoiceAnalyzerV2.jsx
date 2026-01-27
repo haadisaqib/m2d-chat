@@ -2,11 +2,11 @@ import { useState, useRef } from 'react'
 import './InvoiceAnalyzer.css'
 
 function InvoiceAnalyzerV2({ 
-  selectedFile, 
+  files,
+  jobs,
   isAnalyzing, 
-  analysisResult, 
-  onFileSelect, 
-  onAnalyze, 
+  onFilesSelect, 
+  onAnalyzeAll, 
   onReset,
   methodology,
   onMethodologyChange,
@@ -31,28 +31,24 @@ function InvoiceAnalyzerV2({
     e.stopPropagation()
     setDragActive(false)
     
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFile(e.dataTransfer.files[0])
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleFiles(e.dataTransfer.files)
     }
   }
 
   const handleFileInput = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      handleFile(e.target.files[0])
+    if (e.target.files && e.target.files.length > 0) {
+      handleFiles(e.target.files)
     }
   }
 
-  const handleFile = (file) => {
-    if (file.type.includes('image/') || file.type === 'application/pdf') {
-      onFileSelect(file)
-    } else {
-      alert('Please select an image file or PDF')
-    }
+  const handleFiles = (fileList) => {
+    onFilesSelect(fileList)
   }
 
   const analyzeInvoice = () => {
-    if (!selectedFile) return
-    onAnalyze()
+    if (!files || files.length === 0) return
+    onAnalyzeAll()
   }
 
   const resetAnalysis = () => {
@@ -62,9 +58,11 @@ function InvoiceAnalyzerV2({
     }
   }
 
-  // Calculate total emissions
-  const totalEmissions = analysisResult ? 
-    analysisResult.reduce((sum, item) => sum + parseFloat(item.tco2 || 0), 0) : 0
+  // Calculate total emissions for a given result array
+  const calculateTotalEmissions = (analysisResult) => {
+    if (!analysisResult) return 0
+    return analysisResult.reduce((sum, item) => sum + parseFloat(item.tco2 || 0), 0)
+  }
 
   // Escape CSV value (handle commas, quotes, newlines)
   const escapeCsvValue = (value) => {
@@ -77,12 +75,14 @@ function InvoiceAnalyzerV2({
     return stringValue
   }
 
-  // Export analysis results to CSV
-  const exportToCsv = () => {
+  // Export analysis results to CSV (per file)
+  const exportToCsv = (file, analysisResult) => {
     if (!analysisResult || analysisResult.length === 0) {
-      alert('No analysis results to export')
+      alert('No analysis results to export for this file')
       return
     }
+
+    const totalEmissions = calculateTotalEmissions(analysisResult)
 
     const rows = []
 
@@ -90,7 +90,7 @@ function InvoiceAnalyzerV2({
     rows.push('Summary')
     rows.push('File,Total Items,Total Emissions (tCO2)')
     rows.push([
-      escapeCsvValue(selectedFile?.name || 'N/A'),
+      escapeCsvValue(file?.name || 'N/A'),
       escapeCsvValue(analysisResult.length),
       escapeCsvValue(totalEmissions.toFixed(2))
     ].join(','))
@@ -142,7 +142,7 @@ function InvoiceAnalyzerV2({
     
     // Generate filename with timestamp
     const timestamp = new Date().toISOString().split('T')[0] // YYYY-MM-DD
-    const baseFilename = selectedFile?.name?.replace(/\.[^/.]+$/, '') || 'invoice-analysis'
+    const baseFilename = file?.name?.replace(/\.[^/.]+$/, '') || 'invoice-analysis'
     const filename = `${baseFilename}-${timestamp}.csv`
     
     link.setAttribute('href', url)
@@ -175,7 +175,7 @@ function InvoiceAnalyzerV2({
       </div>
 
       <div className="analyzer-content">
-        {!selectedFile ? (
+        {!files || files.length === 0 ? (
           <div
             className={`upload-zone ${dragActive ? 'drag-active' : ''}`}
             onDragEnter={handleDrag}
@@ -194,13 +194,14 @@ function InvoiceAnalyzerV2({
             <h3>Drop your invoice here</h3>
             <p>Or click to browse files</p>
             <div className="supported-formats">
-              Supports: JPG, PNG, PDF
+              Supports: JPG, PNG, PDF • Up to 10 files
             </div>
             <input
               ref={fileInputRef}
               type="file"
               accept="image/*,.pdf"
               onChange={handleFileInput}
+              multiple
               style={{ display: 'none' }}
             />
           </div>
@@ -215,8 +216,8 @@ function InvoiceAnalyzerV2({
                   </svg>
                 </div>
                 <div className="file-details">
-                  <h3>{selectedFile.name}</h3>
-                  <p>{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                  <h3>{files.length} file{files.length > 1 ? 's' : ''} selected</h3>
+                  <p>Up to 10 files will be analyzed in batches of 2</p>
                 </div>
                 <button className="remove-file" onClick={resetAnalysis}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -227,45 +228,76 @@ function InvoiceAnalyzerV2({
               </div>
             </div>
 
-            {!analysisResult && (
-              <div className="analyze-controls">
-                <div className="methodology-controls">
-                  <label htmlFor="methodology-select">Methodology</label>
-                  <select
-                    id="methodology-select"
-                    value={methodology || 'auto'}
-                    onChange={(e) => onMethodologyChange?.(e.target.value)}
-                    disabled={isAnalyzing}
-                  >
-                    <option value="auto">Auto</option>
-                    <option value="activity">Activity</option>
-                    <option value="spend">Spend</option>
-                  </select>
+            <div className="file-list">
+              {jobs && jobs.map((job, index) => (
+                <div key={job.file.name + index} className="file-list-item">
+                  <div className="file-list-main">
+                    <span className="file-name">{job.file.name}</span>
+                    <span className="file-size">
+                      {(job.file.size / 1024 / 1024).toFixed(2)} MB
+                    </span>
+                  </div>
+                  <div className="file-list-status">
+                    {job.status === 'pending' && <span className="status-chip">Pending</span>}
+                    {job.status === 'processing' && (
+                      <span className="status-chip processing">
+                        <span className="spinner small"></span>
+                        Processing
+                      </span>
+                    )}
+                    {job.status === 'success' && <span className="status-chip success">Done</span>}
+                    {job.status === 'error' && (
+                      <span className="status-chip error">
+                        Error
+                      </span>
+                    )}
+                  </div>
+                  {job.error && (
+                    <div className="file-error">
+                      {job.error}
+                    </div>
+                  )}
                 </div>
-                <button
-                  className="analyze-button"
-                  onClick={analyzeInvoice}
+              ))}
+            </div>
+
+            <div className="analyze-controls">
+              <div className="methodology-controls">
+                <label htmlFor="methodology-select">Methodology</label>
+                <select
+                  id="methodology-select"
+                  value={methodology || 'auto'}
+                  onChange={(e) => onMethodologyChange?.(e.target.value)}
                   disabled={isAnalyzing}
                 >
-                  {isAnalyzing ? (
-                    <span className="analyzing">
-                      <span className="spinner"></span>
-                      Analyzing...
-                    </span>
-                  ) : (
-                    <>
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <circle cx="11" cy="11" r="8"></circle>
-                        <path d="m21 21-4.35-4.35"></path>
-                      </svg>
-                      Analyze Invoice
-                    </>
-                  )}
-                </button>
+                  <option value="auto">Auto</option>
+                  <option value="activity">Activity</option>
+                  <option value="spend">Spend</option>
+                </select>
               </div>
-            )}
+              <button
+                className="analyze-button"
+                onClick={analyzeInvoice}
+                disabled={isAnalyzing || !files || files.length === 0}
+              >
+                {isAnalyzing ? (
+                  <span className="analyzing">
+                    <span className="spinner"></span>
+                    Analyzing...
+                  </span>
+                ) : (
+                  <>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="11" cy="11" r="8"></circle>
+                      <path d="m21 21-4.35-4.35"></path>
+                    </svg>
+                    Analyze All
+                  </>
+                )}
+              </button>
+            </div>
 
-            {analysisResult && (
+            {jobs && jobs.some(job => job.status === 'success' && job.result) && (
               <div className="analysis-results">
                 <div className="results-header">
                   <h3>Analysis Results</h3>
@@ -275,111 +307,119 @@ function InvoiceAnalyzerV2({
                   </div>
                 </div>
 
-                <div className="results-grid">
-                  <div className="result-card">
-                    <h4>Summary</h4>
-                    <div className="detail-row">
-                      <span>File:</span>
-                      <span>{selectedFile?.name || 'N/A'}</span>
-                    </div>
-                    <div className="detail-row">
-                      <span>Total Items:</span>
-                      <span>{analysisResult.length}</span>
-                    </div>
-                    <div className="detail-row total">
-                      <span>Total Emissions:</span>
-                      <span>{totalEmissions.toFixed(2)} tCO2</span>
-                    </div>
-                  </div>
+                {jobs.map((job, index) => {
+                  if (job.status !== 'success' || !job.result) return null
+                  const analysisResult = job.result
+                  const totalEmissions = calculateTotalEmissions(analysisResult)
 
-                  <div className="result-card items-card">
-                    <div className="card-header">
-                      <h4>Invoice Items</h4>
-                      <button className="card-toggle" onClick={() => setExpandItems(v => !v)}>
-                        {expandItems ? 'Hide' : 'Show'}
-                      </button>
-                    </div>
-                    {expandItems && (
-                      <div className="table-wrapper scroll-section">
-                        <table className="cell-table">
-                          <thead>
-                            <tr>
-                              <th>Name</th>
-                              <th>Quantity</th>
-                              <th>Consumption</th>
-                              <th>Supplier</th>
-                              <th>Emissions (tCO2)</th>
-                              <th>Confidence</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {analysisResult.length === 0 && (
-                              <tr>
-                                <td colSpan={6} className="empty">No items found</td>
-                              </tr>
-                            )}
-                            {analysisResult.map((item, idx) => (
-                              <tr key={idx}>
-                                <td className="item-name">{item.name || item.description || '—'}</td>
-                                <td>{item.usages} {item.usageUnit || ''}</td>
-                                <td>{item.consumption} {item.consumptionUnit || ''}</td>
-                                <td>{item.tagName || '—'}</td>
-                                <td className="emissions">{parseFloat(item.tco2 || 0).toFixed(2)}</td>
-                                <td>{item.weightConfidence || 0}%</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                  return (
+                    <div key={job.file.name + index} className="results-grid">
+                      <div className="result-card">
+                        <h4>Summary - {job.file.name}</h4>
+                        <div className="detail-row">
+                          <span>File:</span>
+                          <span>{job.file.name}</span>
+                        </div>
+                        <div className="detail-row">
+                          <span>Total Items:</span>
+                          <span>{analysisResult.length}</span>
+                        </div>
+                        <div className="detail-row total">
+                          <span>Total Emissions:</span>
+                          <span>{totalEmissions.toFixed(2)} tCO2</span>
+                        </div>
                       </div>
-                    )}
-                  </div>
 
-                  <div className="result-card items-card">
-                    <div className="card-header">
-                      <h4>Emission Factors</h4>
-                      <button className="card-toggle" onClick={() => setExpandItems(v => !v)}>
-                        {expandItems ? 'Hide' : 'Show'}
-                      </button>
-                    </div>
-                    {expandItems && (
-                      <div className="table-wrapper scroll-section">
-                        <table className="cell-table">
-                          <thead>
-                            <tr>
-                              <th>Item</th>
-                              <th>Factor Name</th>
-                              <th>CO2 Value</th>
-                              <th>Unit</th>
-                              <th>Confidence</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {analysisResult.map((item, idx) => (
-                              item.factor && (
-                                <tr key={idx}>
-                                  <td className="item-name">{item.name || '—'}</td>
-                                  <td>{item.factor.name || '—'}</td>
-                                  <td>{item.factor.co2 || '—'}</td>
-                                  <td>{item.factor.co2_unit || '—'}</td>
-                                  <td>{item.factor.factorConfidence || 0}%</td>
+                      <div className="result-card items-card">
+                        <div className="card-header">
+                          <h4>Invoice Items</h4>
+                          <button className="card-toggle" onClick={() => setExpandItems(v => !v)}>
+                            {expandItems ? 'Hide' : 'Show'}
+                          </button>
+                        </div>
+                        {expandItems && (
+                          <div className="table-wrapper scroll-section">
+                            <table className="cell-table">
+                              <thead>
+                                <tr>
+                                  <th>Name</th>
+                                  <th>Quantity</th>
+                                  <th>Consumption</th>
+                                  <th>Supplier</th>
+                                  <th>Emissions (tCO2)</th>
+                                  <th>Confidence</th>
                                 </tr>
-                              )
-                            ))}
-                          </tbody>
-                        </table>
+                              </thead>
+                              <tbody>
+                                {analysisResult.length === 0 && (
+                                  <tr>
+                                    <td colSpan={6} className="empty">No items found</td>
+                                  </tr>
+                                )}
+                                {analysisResult.map((item, idx) => (
+                                  <tr key={idx}>
+                                    <td className="item-name">{item.name || item.description || '—'}</td>
+                                    <td>{item.usages} {item.usageUnit || ''}</td>
+                                    <td>{item.consumption} {item.consumptionUnit || ''}</td>
+                                    <td>{item.tagName || '—'}</td>
+                                    <td className="emissions">{parseFloat(item.tco2 || 0).toFixed(2)}</td>
+                                    <td>{item.weightConfidence || 0}%</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                </div>
 
-                <div className="action-buttons">
-                  <button className="secondary-button" onClick={resetAnalysis}>
-                    Analyze Another
-                  </button>
-                  <button className="primary-button" onClick={exportToCsv}>
-                    Export Results
-                  </button>
-                </div>
+                      <div className="result-card items-card">
+                        <div className="card-header">
+                          <h4>Emission Factors</h4>
+                          <button className="card-toggle" onClick={() => setExpandItems(v => !v)}>
+                            {expandItems ? 'Hide' : 'Show'}
+                          </button>
+                        </div>
+                        {expandItems && (
+                          <div className="table-wrapper scroll-section">
+                            <table className="cell-table">
+                              <thead>
+                                <tr>
+                                  <th>Item</th>
+                                  <th>Factor Name</th>
+                                  <th>CO2 Value</th>
+                                  <th>Unit</th>
+                                  <th>Confidence</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {analysisResult.map((item, idx) => (
+                                  item.factor && (
+                                    <tr key={idx}>
+                                      <td className="item-name">{item.name || '—'}</td>
+                                      <td>{item.factor.name || '—'}</td>
+                                      <td>{item.factor.co2 || '—'}</td>
+                                      <td>{item.factor.co2_unit || '—'}</td>
+                                      <td>{item.factor.factorConfidence || 0}%</td>
+                                    </tr>
+                                  )
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="action-buttons">
+                        <button className="secondary-button" onClick={resetAnalysis}>
+                          Analyze Other Files
+                        </button>
+                        <button className="primary-button" onClick={() => exportToCsv(job.file, analysisResult)}>
+                          Export Results
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             )}
           </div>

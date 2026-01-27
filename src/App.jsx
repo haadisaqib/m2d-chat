@@ -19,9 +19,9 @@ function App() {
   const [invoiceAnalyzing, setInvoiceAnalyzing] = useState(false)
   const [invoiceMethodology, setInvoiceMethodology] = useState('auto')
   
-  // Invoice analyzer V2 state
-  const [invoiceV2File, setInvoiceV2File] = useState(null)
-  const [invoiceV2Analysis, setInvoiceV2Analysis] = useState(null)
+  // Invoice analyzer V2 state (multi-file)
+  const [invoiceV2Files, setInvoiceV2Files] = useState([])
+  const [invoiceV2Jobs, setInvoiceV2Jobs] = useState([]) // { file, status, result, error }
   const [invoiceV2Analyzing, setInvoiceV2Analyzing] = useState(false)
   const [invoiceV2Methodology, setInvoiceV2Methodology] = useState('auto')
   
@@ -260,9 +260,107 @@ function App() {
     setInvoiceAnalysis(null)
   }
 
-  // Invoice V2 analysis handler
+  // Helper: analyze a single invoice V2 file
+  const analyzeSingleInvoiceV2 = async (file, methodology) => {
+    // Convert file to base64 using ArrayBuffer (no data URI prefix)
+    const arrayBuffer = await file.arrayBuffer()
+    const uint8Array = new Uint8Array(arrayBuffer)
+    let binaryString = ''
+    const chunkSize = 8192 // Process in chunks to avoid stack overflow
+    for (let i = 0; i < uint8Array.length; i += chunkSize) {
+      const chunk = uint8Array.slice(i, i + chunkSize)
+      binaryString += String.fromCharCode(...chunk)
+    }
+    const base64Data = btoa(binaryString)
+
+    // Prepare API payload
+    const payload = {
+      document_base64: base64Data,
+      filename: file.name
+    }
+
+    // Make API call to V2 endpoint
+    const url = `${baseUrl}/api/v1/invoice-analyzer-v2/invoice?methodology=${encodeURIComponent(methodology || 'auto')}`
+
+    console.log('V2 Request URL:', url)
+    console.log('V2 Request payload:', payload)
+    console.log('V2 Base64 length:', base64Data.length)
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Internal-Secret': apiKey
+      },
+      body: JSON.stringify(payload)
+    })
+
+    console.log('V2 Response status:', response.status)
+    console.log('V2 Response headers:', Object.fromEntries(response.headers.entries()))
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('V2 Error response:', errorText)
+      throw new Error(`HTTP ${response.status}: ${errorText}`)
+    }
+
+    const responseText = await response.text()
+    console.log('V2 Raw response text:', responseText)
+
+    // Try to extract JSON from the response (in case there are log messages mixed in)
+    let data
+    try {
+      // First try to parse the entire response as JSON
+      data = JSON.parse(responseText)
+    } catch (parseError) {
+      console.log('Failed to parse as JSON, trying to extract JSON from response')
+      // If that fails, try to find JSON array in the response
+      // Look for the first '[' that starts a JSON array
+      const firstBracket = responseText.indexOf('[')
+      if (firstBracket !== -1) {
+        // Find the matching closing bracket by counting brackets
+        let bracketCount = 0
+        let endIndex = firstBracket
+        for (let i = firstBracket; i < responseText.length; i++) {
+          if (responseText[i] === '[') bracketCount++
+          if (responseText[i] === ']') bracketCount--
+          if (bracketCount === 0) {
+            endIndex = i
+            break
+          }
+        }
+        const jsonString = responseText.substring(firstBracket, endIndex + 1)
+        data = JSON.parse(jsonString)
+      } else {
+        throw new Error('Could not find JSON array in response')
+      }
+    }
+
+    console.log('V2 Parsed data:', data)
+    console.log('Data type:', typeof data)
+    console.log('Has result?', !!data?.result)
+    console.log('Has emission_calculations?', !!data?.result?.emission_calculations)
+    console.log('Is emission_calculations array?', Array.isArray(data?.result?.emission_calculations))
+
+    // V2 API returns a wrapper object with emissions in result.emission_calculations
+    if (data && data.result && Array.isArray(data.result.emission_calculations)) {
+      console.log('Setting V2 analysis with emissions array')
+      return data.result.emission_calculations
+    } else if (data && data.status === 'error') {
+      throw new Error(data.detail || 'Failed to analyze invoice')
+    } else if (Array.isArray(data)) {
+      // Fallback: if it's still a direct array (old format)
+      console.log('Fallback: Using direct array data as V2 analysis')
+      return data
+    } else {
+      console.log('Unexpected response format:', data)
+      throw new Error('Unexpected response format')
+    }
+  }
+
+  // Invoice V2 analysis handler (multi-file with max 2 concurrent)
   const analyzeInvoiceV2 = async () => {
-    if (!invoiceV2File) return
+    if (!invoiceV2Files || invoiceV2Files.length === 0) return
 
     if (!apiKey) {
       alert('Error: API key is missing. Please set VITE_INTERNAL_API_KEY in your .env file and restart the dev server.')
@@ -270,126 +368,105 @@ function App() {
     }
 
     setInvoiceV2Analyzing(true)
-    setInvoiceV2Analysis(null)
+    // Reset job statuses/results
+    setInvoiceV2Jobs(prev =>
+      prev.map(job => ({
+        ...job,
+        status: 'pending',
+        result: null,
+        error: null
+      }))
+    )
     
     try {
-      // Convert file to base64 using ArrayBuffer (no data URI prefix)
-      const arrayBuffer = await invoiceV2File.arrayBuffer()
-      const uint8Array = new Uint8Array(arrayBuffer)
-      let binaryString = ''
-      const chunkSize = 8192 // Process in chunks to avoid stack overflow
-      for (let i = 0; i < uint8Array.length; i += chunkSize) {
-        const chunk = uint8Array.slice(i, i + chunkSize)
-        binaryString += String.fromCharCode(...chunk)
-      }
-      const base64Data = btoa(binaryString)
-      
-      // Prepare API payload
-      const payload = {
-        document_base64: base64Data,
-        filename: invoiceV2File.name
-      }
+      const maxConcurrent = 2
+      let currentIndex = 0
 
-      // Make API call to V2 endpoint
-      const url = `${baseUrl}/api/v1/invoice-analyzer-v2/invoice?methodology=${encodeURIComponent(invoiceV2Methodology || 'auto')}`
-      
-      console.log('V2 Request URL:', url)
-      console.log('V2 Request payload:', payload)
-      console.log('V2 Base64 length:', base64Data.length)
-      
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Internal-Secret': apiKey
-        },
-        body: JSON.stringify(payload)
-      })
+      const runNext = async () => {
+        const index = currentIndex++
+        if (index >= invoiceV2Files.length) return
 
-      console.log('V2 Response status:', response.status)
-      console.log('V2 Response headers:', Object.fromEntries(response.headers.entries()))
+        const file = invoiceV2Files[index]
 
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error('V2 Error response:', errorText)
-        throw new Error(`HTTP ${response.status}: ${errorText}`)
-      }
+        // Mark job as processing
+        setInvoiceV2Jobs(prev =>
+          prev.map((job, i) =>
+            i === index ? { ...job, status: 'processing', error: null } : job
+          )
+        )
 
-      const responseText = await response.text()
-      console.log('V2 Raw response text:', responseText)
-      
-      // Try to extract JSON from the response (in case there are log messages mixed in)
-      let data
-      try {
-        // First try to parse the entire response as JSON
-        data = JSON.parse(responseText)
-      } catch (parseError) {
-        console.log('Failed to parse as JSON, trying to extract JSON from response')
-        // If that fails, try to find JSON array in the response
-        // Look for the first '[' that starts a JSON array
-        const firstBracket = responseText.indexOf('[')
-        if (firstBracket !== -1) {
-          // Find the matching closing bracket by counting brackets
-          let bracketCount = 0
-          let endIndex = firstBracket
-          for (let i = firstBracket; i < responseText.length; i++) {
-            if (responseText[i] === '[') bracketCount++
-            if (responseText[i] === ']') bracketCount--
-            if (bracketCount === 0) {
-              endIndex = i
-              break
-            }
-          }
-          const jsonString = responseText.substring(firstBracket, endIndex + 1)
-          data = JSON.parse(jsonString)
-        } else {
-          throw new Error('Could not find JSON array in response')
+        try {
+          const result = await analyzeSingleInvoiceV2(file, invoiceV2Methodology)
+          setInvoiceV2Jobs(prev =>
+            prev.map((job, i) =>
+              i === index ? { ...job, status: 'success', result } : job
+            )
+          )
+        } catch (error) {
+          console.error('Error analyzing invoice V2:', error)
+          setInvoiceV2Jobs(prev =>
+            prev.map((job, i) =>
+              i === index
+                ? { ...job, status: 'error', error: error.message || 'Unknown error' }
+                : job
+            )
+          )
         }
-      }
-      
-      console.log('V2 Parsed data:', data)
-      console.log('Data type:', typeof data)
-      console.log('Has result?', !!data?.result)
-      console.log('Has emission_calculations?', !!data?.result?.emission_calculations)
-      console.log('Is emission_calculations array?', Array.isArray(data?.result?.emission_calculations))
 
-      // V2 API returns a wrapper object with emissions in result.emission_calculations
-      if (data && data.result && Array.isArray(data.result.emission_calculations)) {
-        console.log('Setting V2 analysis with emissions array')
-        setInvoiceV2Analysis(data.result.emission_calculations)
-      } else if (data && data.status === 'error') {
-        throw new Error(data.detail || 'Failed to analyze invoice')
-      } else if (Array.isArray(data)) {
-        // Fallback: if it's still a direct array (old format)
-        console.log('Fallback: Setting V2 analysis with direct array data')
-        setInvoiceV2Analysis(data)
-      } else {
-        console.log('Unexpected response format:', data)
-        throw new Error('Unexpected response format')
+        // Start next job in this worker
+        await runNext()
       }
+
+      const workers = []
+      const workerCount = Math.min(maxConcurrent, invoiceV2Files.length)
+      for (let i = 0; i < workerCount; i++) {
+        workers.push(runNext())
+      }
+
+      await Promise.all(workers)
     } catch (error) {
-      console.error('Error analyzing invoice V2:', error)
-      alert(`Failed to analyze invoice: ${error.message}`)
-      setInvoiceV2Analysis(null)
+      console.error('Error in V2 batch analysis:', error)
+      alert(`Failed to analyze one or more invoices: ${error.message}`)
     } finally {
       setInvoiceV2Analyzing(false)
     }
   }
 
-  // Invoice V2 file handler
-  const handleInvoiceV2File = (file) => {
-    if (file.type.includes('image/') || file.type === 'application/pdf') {
-      setInvoiceV2File(file)
-      setInvoiceV2Analysis(null)
-    } else {
-      alert('Please select an image file or PDF')
+  // Invoice V2 file handler (multi-file, up to 10)
+  const handleInvoiceV2Files = (files) => {
+    const allFiles = Array.from(files || [])
+    if (allFiles.length === 0) return
+
+    const validFiles = allFiles.filter(
+      (file) => file.type.includes('image/') || file.type === 'application/pdf'
+    )
+
+    if (validFiles.length === 0) {
+      alert('Please select image files or PDFs only')
+      return
     }
+
+    if (validFiles.length > 10) {
+      alert('You can only analyze up to 10 files at once. Only the first 10 will be used.')
+    }
+
+    const limitedFiles = validFiles.slice(0, 10)
+
+    setInvoiceV2Files(limitedFiles)
+    setInvoiceV2Jobs(
+      limitedFiles.map((file) => ({
+        file,
+        status: 'pending',
+        result: null,
+        error: null
+      }))
+    )
   }
 
   // Invoice V2 reset handler
   const resetInvoiceV2Analysis = () => {
-    setInvoiceV2File(null)
-    setInvoiceV2Analysis(null)
+    setInvoiceV2Files([])
+    setInvoiceV2Jobs([])
   }
 
 
@@ -453,7 +530,7 @@ function App() {
               <line x1="6" y1="20" x2="6" y2="14"></line>
             </svg>
             Invoice Analyzer V2
-            {invoiceV2File && !invoiceV2Analyzing && !invoiceV2Analysis && (
+            {invoiceV2Files.length > 0 && !invoiceV2Analyzing && !invoiceV2Jobs.some(job => job.status === 'success') && (
               <span className="tab-status file-uploaded">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -470,7 +547,7 @@ function App() {
                 </svg>
               </span>
             )}
-            {invoiceV2Analysis && (
+            {invoiceV2Jobs.some(job => job.status === 'success') && (
               <span className="tab-status completed">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polyline points="20 6 9 17 4 12"></polyline>
@@ -625,11 +702,11 @@ function App() {
         </div>
       ) : activeTab === 'invoice-v2' ? (
         <InvoiceAnalyzerV2 
-          selectedFile={invoiceV2File}
+          files={invoiceV2Files}
+          jobs={invoiceV2Jobs}
           isAnalyzing={invoiceV2Analyzing}
-          analysisResult={invoiceV2Analysis}
-          onFileSelect={handleInvoiceV2File}
-          onAnalyze={analyzeInvoiceV2}
+          onFilesSelect={handleInvoiceV2Files}
+          onAnalyzeAll={analyzeInvoiceV2}
           onReset={resetInvoiceV2Analysis}
           methodology={invoiceV2Methodology}
           onMethodologyChange={setInvoiceV2Methodology}
