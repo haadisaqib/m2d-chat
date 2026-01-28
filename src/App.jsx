@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import ReactMarkdown from 'react-markdown'
 import InvoiceAnalyzer from './InvoiceAnalyzer'
 import InvoiceAnalyzerV2 from './InvoiceAnalyzerV2'
+import InvoiceAnalyzerService from './InvoiceAnalyzerService'
 import './App.css'
 import m2dLogo from './assets/m2d.png'
 
@@ -24,6 +25,11 @@ function App() {
   const [invoiceV2Jobs, setInvoiceV2Jobs] = useState([]) // { file, status, result, error }
   const [invoiceV2Analyzing, setInvoiceV2Analyzing] = useState(false)
   const [invoiceV2Methodology, setInvoiceV2Methodology] = useState('auto')
+  
+  // Service-based invoice analyzer state
+  const [serviceInvoiceFile, setServiceInvoiceFile] = useState(null)
+  const [serviceInvoiceResult, setServiceInvoiceResult] = useState(null)
+  const [serviceInvoiceAnalyzing, setServiceInvoiceAnalyzing] = useState(false)
   
   const messagesEndRef = useRef(null)
   const textareaRef = useRef(null)
@@ -258,6 +264,96 @@ function App() {
   const resetInvoiceAnalysis = () => {
     setInvoiceFile(null)
     setInvoiceAnalysis(null)
+  }
+
+  // Service invoice file handler
+  const handleServiceInvoiceFile = (file) => {
+    if (file.type.includes('image/') || file.type === 'application/pdf') {
+      setServiceInvoiceFile(file)
+      setServiceInvoiceResult(null)
+    } else {
+      alert('Please select an image file or PDF')
+    }
+  }
+
+  // Service invoice reset handler
+  const resetServiceInvoiceAnalysis = () => {
+    setServiceInvoiceFile(null)
+    setServiceInvoiceResult(null)
+  }
+
+  // Service-based invoice analysis handler
+  const analyzeServiceInvoice = async () => {
+    if (!serviceInvoiceFile) return
+
+    if (!apiKey) {
+      alert('Error: API key is missing. Please set VITE_INTERNAL_API_KEY in your .env file and restart the dev server.')
+      return
+    }
+
+    setServiceInvoiceAnalyzing(true)
+    setServiceInvoiceResult(null)
+
+    try {
+      // Convert file to base64 using ArrayBuffer (no data URI prefix)
+      const arrayBuffer = await serviceInvoiceFile.arrayBuffer()
+      const uint8Array = new Uint8Array(arrayBuffer)
+      let binaryString = ''
+      const chunkSize = 8192 // Process in chunks to avoid stack overflow
+      for (let i = 0; i < uint8Array.length; i += chunkSize) {
+        const chunk = uint8Array.slice(i, i + chunkSize)
+        binaryString += String.fromCharCode(...chunk)
+      }
+      const base64Data = btoa(binaryString)
+
+      const payload = {
+        document_base64: base64Data,
+        filename: serviceInvoiceFile.name || 'invoice.pdf'
+      }
+
+      const url = `${baseUrl}/api/v1/invoice-analyzer-service-based/invoice`
+
+      console.log('Service-based Request URL:', url)
+      console.log('Service-based Request payload:', payload)
+      console.log('Service-based Base64 length:', base64Data.length)
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Internal-Secret': apiKey
+        },
+        body: JSON.stringify(payload)
+      })
+
+      console.log('Service-based Response status:', response.status)
+      console.log('Service-based Response headers:', Object.fromEntries(response.headers.entries()))
+
+      const data = await response.json()
+      console.log('Service-based Parsed data:', data)
+
+      if (!response.ok) {
+        const message = data?.message || `HTTP ${response.status}`
+        throw new Error(message)
+      }
+
+      if (data && data.result) {
+        // Flatten top-level metadata and result for easier rendering
+        setServiceInvoiceResult({
+          api_status: data.status,
+          api_message: data.message,
+          ...data.result
+        })
+      } else {
+        throw new Error(data?.message || 'Failed to analyze service invoice')
+      }
+    } catch (error) {
+      console.error('Error analyzing service invoice:', error)
+      alert(`Failed to analyze service invoice: ${error.message}`)
+      setServiceInvoiceResult(null)
+    } finally {
+      setServiceInvoiceAnalyzing(false)
+    }
   }
 
   // Helper: analyze a single invoice V2 file
@@ -555,6 +651,45 @@ function App() {
               </span>
             )}
           </button>
+          <button 
+            className={`tab-button ${activeTab === 'invoice-service' ? 'active' : ''}`}
+            onClick={() => setActiveTab('invoice-service')}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 21h16"></path>
+              <path d="M6 21V7"></path>
+              <path d="M10 21V7"></path>
+              <path d="M14 21V7"></path>
+              <path d="M18 21V7"></path>
+              <path d="M3 7h18"></path>
+              <path d="M12 3l1.5 2h-3L12 3z"></path>
+            </svg>
+            Service Invoice
+            {serviceInvoiceFile && !serviceInvoiceAnalyzing && !serviceInvoiceResult && (
+              <span className="tab-status file-uploaded">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="17 8 12 3 7 8"></polyline>
+                  <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+              </span>
+            )}
+            {serviceInvoiceAnalyzing && (
+              <span className="tab-status analyzing">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+              </span>
+            )}
+            {serviceInvoiceResult && (
+              <span className="tab-status completed">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </span>
+            )}
+          </button>
           <div className="controls-group">
             <div className="env-toggle">
               <span className="env-label">Env</span>
@@ -710,6 +845,16 @@ function App() {
           onReset={resetInvoiceV2Analysis}
           methodology={invoiceV2Methodology}
           onMethodologyChange={setInvoiceV2Methodology}
+          theme={theme}
+        />
+      ) : activeTab === 'invoice-service' ? (
+        <InvoiceAnalyzerService
+          selectedFile={serviceInvoiceFile}
+          isAnalyzing={serviceInvoiceAnalyzing}
+          result={serviceInvoiceResult}
+          onFileSelect={handleServiceInvoiceFile}
+          onAnalyze={analyzeServiceInvoice}
+          onReset={resetServiceInvoiceAnalysis}
           theme={theme}
         />
       ) : (
